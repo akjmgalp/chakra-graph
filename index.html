@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<!--[if IE 8]>    <html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en"> <!--<![endif]-->
+
+<meta http-equiv="content-type" content="text/html;charset=utf-8" />
+<head>
+	<meta charset="utf-8" />
+	<title>Chackra</title>
+	<meta name="viewport" content="width=device-width" />
+	<link rel="stylesheet" type="text/css" href="assets/style.css"/>
+	<link rel="stylesheet" type="text/css" href="assets/foundation/foundation.min.css">
+<style>
+textarea {
+	white-space: pre;
+	overflow: scroll;
+	font-size: 10pt;
+	font-family: 'Droid Sans Mono', Menlo, Consolas, 'Courier New', Courier, monospace, sans-serif;
+}
+</style>
+</head>
+
+<body>
+
+  <!-- Navigation bar -->
+  <div class="row">
+    <div class="twelve columns">
+      <nav class="top-bar">
+        <ul>
+          <li class="name">
+             <h1><a href="#">Chakra</a></h1>
+          </li>
+        </ul>
+        <section>
+          <ul class="right">
+            <li class="divider show-for-medium-and-up"></li>
+            <li>
+              <a href="#">Abstract</a>  
+            </li>
+            <li class="has-dropdown">
+              <a href="#">Project</a>
+              <ul class="dropdown">
+                <li><a href="https://github.com/akjmgalp/chakra-graph" target="_blank">Git Repository</a></li>
+                <li class="divider"></li>
+                <li><label>Contributers</label></li>
+                <li><a href="http://ii.metu.edu.tr/staff/betincan" target="_blank">Assoc. Prof. Dr. <br>Aysu Betin Can</a></li>
+                <li><a href="http://ibrahimbilge.com" target="_blank">Ibrahim Bilge</a></li>
+              </ul>
+            </li>
+            <li>
+              <a href="#">Contact</a>
+            </li>
+          </ul>
+        </section>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Title and subtitle -->
+  <div class="row">
+    <div class="twelve columns">
+       <h3 class="subheader"><strong>Chakra</strong> control flow graph creator for js apps.</h3>
+	   <p style="text-align: justify;"><strong>TODO: Rewrite</strong> JavaScript is one of the most common scripting languages used for developing web applications. It can be used to create truly flexible, efficient code thanks to its highly dynamic nature. In addition, many structural frameworks have been developed for building even more extensible and more dynamic web applications. One of the most popular of these frameworks is AngularJS which uses MVW (Model-View-Whatever where Whatever stands for "whatever works for your domain") pattern. The dynamism of JavaScript including abstraction and layering of AngularJS can make coding very challenging by making it open for mistakes and susceptible to inconsistencies that create unreadable, not maintainable and particularly unreliable code. Over the recent years, many researchers have focused on this subject but almost all of them have interested in detecting the mistakes causing inconsistencies. Differing from the existing studies in literature, our aim in this study is to focus on preventing instead of detecting inconsistencies in JavaScript - AngularJS applications by using compile time scan methodology and/or introducing and implementing specific consistency models/patterns.</p>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="row">
+    <div class="six columns">
+<textarea id="editor" spellcheck="false" style="height: 400px">
+// Your script
+var age = 2015 * 1989;
+</textarea>	
+    </div>
+
+    <div class="six columns">
+      <textarea id="tokens" rows="30" readonly style="height: 400px">// Result</textarea>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="row copyright">
+    <div class="six columns">
+      <p>Chakra is created and maintained by <a href="http://ibrahimbilge.com" target="_blank">Ibrahim Bilge</a>.</p>
+    </div>
+    <div class="six columns">
+      <ul class="link-list right">
+        <li><a href="http://www.metu.edu.tr/" target="_blank">@METU</a></li>
+        <li><a href="http://yte.bilgem.tubitak.gov.tr/" target="_blank">@TUBITAK</a></li>
+      </ul>
+    </div>
+  </div>
+
+<script src="esprima.js"></script>
+<script src="utility.ric.js"></script>
+<script src="ibrahimb.ric.js"></script>
+
+</body>
+</html>
