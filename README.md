@@ -7,4 +7,4 @@ JavaScript is one of the most common scripting languages used for developing web
 
 - /* -------------------- */ - 
 
-http://ibrahimbilge.com/ric/
+http://kodrehberi.com/chakra/
