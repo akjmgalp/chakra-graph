@@ -18,26 +18,19 @@ function readFile() {
 	/* A hash map includes function name x function body pairs */
 	var functionMap = {};
 
-	/* Main tree traverse method */
+	/* Main traverse method */
 	function traverse(object, checker) {
 		
 		if (utility.isArray(object)) {
 			for (var i = 0; i < object.length; i++) {
-				traverse(object[i], checker);
+				if (utility.isDefinedAndNotNull(object[i])) {
+					traverse(object[i], checker);
+				}
 			}
 			return;
 		}
 		
 	    checker.call(null, object);
-	      
-	    for (var key in object) {
-	        if (object.hasOwnProperty(key)) {
-	            var child = object[key];
-	            if (utility.isObject(child)) {
-	                traverse(child, checker);
-	            }
-	        }
-	    }
 	}
 
 	/* Main check method: 'traverse' calls this for the nodes it traverses,
@@ -49,15 +42,28 @@ function readFile() {
 			visitor.visit(node);
 		};
 		
+		node.accept(new ProgramChecker());
+		node.accept(new BlockStatementChecker());
+		node.accept(new ExpressionStatementChecker());
+		node.accept(new ArrayExpressionChecker());
+		node.accept(new ObjectExpressionChecker());
+		node.accept(new BinaryExpressionChecker());
+		node.accept(new UpdateExpressionChecker());
+		node.accept(new LogicalExpressionChecker());
+		node.accept(new AssignmentExpressionChecker());
+		node.accept(new PropertyChecker());
+		
 		node.accept(new VariableDeclarationChecker());
 		node.accept(new ModelVariableDeclarationChecker());
 		
 		node.accept(new FunctionCallChecker());
 		node.accept(new ModelFunctionCallChecker());
 		
-		node.accept(new AssignmentExpressionChecker());
-		
 		node.accept(new IfStatementChecker());
+		node.accept(new ForStatementChecker());
+		node.accept(new ForInStatementChecker());
+		node.accept(new WhileStatementChecker());
+		node.accept(new ReturnStatementChecker());
 	}
 
 	/* A metadata includes variable name, a flag determines model variable, and the CFG of the variable */
@@ -81,17 +87,16 @@ function readFile() {
 	/* gets the tempMetadata of the variable from map, if not exists creates new */
 	function getTempMetadataOfVariable(isInBlockFlag, varName, isModelVar) {
 		var tempMetadataList = utility.getLast(tempMetadataListStack);
-		var metadata = tempMetadataList[varName];
-		if (utility.isUndefinedOrNull(metadata)) {
-			metadata = createNewMetadata(varName, isModelVar);
+		if (utility.isUndefinedOrNull(tempMetadataList[varName])) {
+			tempMetadataList[varName] = createNewMetadata(varName, isModelVar);
 			
 			// it is in consequent or alternate of an if block
 			if (isInBlockFlag === 0 || isInBlockFlag === 1) {
-				metadata.cfg = [null, null];  
-				metadata.lastNode = [null, null];
+				tempMetadataList[varName].cfg = [null, null];  
+				tempMetadataList[varName].lastNode = [null, null];
 			}
 		}
-		return metadata;
+		return tempMetadataList[varName];
 	}
 
 	/* adds a new empty node to CFG of the metadata of the variable */
@@ -104,6 +109,8 @@ function readFile() {
 
 	/* adds new node to CFG of the metadata of the variable */
 	function addNewNodeToCFGOfVariable(varName, isModelVar, node, type) {
+		if (utility.isUndefined(varName)) return;
+		
 		var metadata = getMetadataOfVariable(varName, isModelVar);
 		//var cfg = {type: type, node: node, next: null}; //TODO: temporary
 		var cfg = {type: type, node: {}, next: null};
@@ -115,7 +122,7 @@ function readFile() {
 		// flow is in a loop block or much deeper
 		if (utility.isNotEmpty(isInBlockStack)) {
 			var isInBlockFlag = utility.getLast(isInBlockStack);
-			metadata = getTempMetadataOfVariable(isInBlockFlag, varName, isModelVar);
+			metadata = getTempMetadataOfVariable(isInBlockFlag, metadata.name, metadata.isModelVar);
 			
 			if (isInBlockFlag === 0 || isInBlockFlag === 1) {
 				addNewCFGToTempMetadataForIfStatement(isInBlockFlag, metadata, cfg);
@@ -149,9 +156,9 @@ function readFile() {
 		functionMap[name] = body;
 	}
 
-	function checkFunctionDeclaration(declarator) {
-		if (declarator.init.type === 'FunctionExpression') {
-			addFunctionDefinitionToFunctionMap(declarator.id.name, declarator.init);
+	function checkFunctionDeclaration(varName, node) {
+		if (node.type === 'FunctionExpression') {
+			addFunctionDefinitionToFunctionMap(varName, node.body);
 		}
 	}
 
@@ -193,15 +200,25 @@ function readFile() {
 				}
 				
 				/* tempMetadata is an if block */
-				if (utility.isArray(tempMetada.cfg)) {
+				if (utility.isArray(tempMetadata.cfg)) {
 					lastNodeOfRealMetadata.left = tempMetadata.cfg[0];
 					lastNodeOfRealMetadata.right = tempMetadata.cfg[1];
 					lastNodeOfRealMetadata.next = tempMetadata.cfg[0];
 					
-					lastNodeOfRealMetadata = {type: "EMPTY", node: null, next: null};
+					var newLastNodeOfRealMetadata = {type: "EMPTY", node: null, next: null};
 					
-					tempMetadata.lastNode[0].next = lastNodeOfRealMetadata;
-					tempMetadata.lastNode[1].next = lastNodeOfRealMetadata;
+					lastNodeOfRealMetadata.left.next = newLastNodeOfRealMetadata;
+					if (utility.isDefinedAndNotNull(lastNodeOfRealMetadata.right)) {
+						lastNodeOfRealMetadata.right.next = newLastNodeOfRealMetadata;
+					} else {
+						lastNodeOfRealMetadata.right = newLastNodeOfRealMetadata;
+					}
+					
+					if (isInBlockFlag === 0 || isInBlockFlag === 1) {
+						realMetadata.lastNode[isInBlockFlag] = newLastNodeOfRealMetadata;
+					} else {
+						realMetadata.lastNode = newLastNodeOfRealMetadata;
+					}
 				} 
 				/* tempMetadata is loop block (for, while) */
 				else {
@@ -222,6 +239,122 @@ function readFile() {
 
 	//*   Checkers AKA Visitors   *//
 	//--------------------------------//
+	var ProgramChecker = function() {
+	
+		this.visit = function(node) {
+		
+			if (node.type === 'Program') {
+				traverse(node.body, checkNode);
+			}
+		}
+		
+	}
+	
+	var BlockStatementChecker = function() {
+	
+		this.visit = function(node) {
+		
+			if (node.type === 'BlockStatement') {
+				traverse(node.body, checkNode);
+			}
+		}
+		
+	}
+	
+	var ExpressionStatementChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'ExpressionStatement') {
+				addNewNodeToCFGOfVariable(node.expression.name, false, node, 'USE');
+			}
+		}
+		
+	}
+	
+	var ArrayExpressionChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'ArrayExpression') {
+				traverse(node.elements, checkNode);
+			}
+		}
+		
+	}
+	
+	var ObjectExpressionChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'ObjectExpression') {
+				traverse(node.properties, checkNode);
+			}
+		}
+		
+	}
+	
+	var PropertyChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'Property') {
+				var usageType = (node.kind === 'init' || node.kind === 'set') ? 'DEF' : 'USE';
+				addNewNodeToCFGOfVariable(node.key.name, false, node.value, usageType);
+			}
+		}
+		
+	}
+	
+	var BinaryExpressionChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'BinaryExpression') {
+				traverse(node.left, checkNode);
+				traverse(node.right, checkNode);
+			}
+		}
+		
+	}
+	
+	var UpdateExpressionChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'UpdateExpression') {
+				traverse(node.argument, checkNode);
+			}
+		}
+		
+	}
+	
+	var LogicalExpressionChecker = function() {
+	
+		this.visit = function(node) {
+			
+			if (node.type === 'LogicalExpression') {
+				traverse(node.left, checkNode);
+				traverse(node.right, checkNode);
+			}
+		}
+		
+	}
+	
+	var AssignmentExpressionChecker = function() {
+
+		this.visit = function(node) {
+		
+			if (node.type === 'ExpressionStatement' && node.expression.type === 'AssignmentExpression') {
+				addNewNodeToCFGOfVariable(node.expression.left.name, false, node.expression.right, 'DEF');
+				if (utility.isDefinedAndNotNull(node.expression.right)) {
+					traverse(node.expression.right, checkNode);
+				}
+			}
+		}
+		
+	}
+	
 	var VariableDeclarationChecker = function() {
 
 		this.visit = function(node) {
@@ -232,8 +365,12 @@ function readFile() {
 					var declarator = declarations[i];
 					
 					addNewNodeToCFGOfVariable(declarator.id.name, false, declarator.init, 'DEF');
-					
-					checkFunctionDeclaration(declarator);
+			
+					if (utility.isDefinedAndNotNull(declarator.init)) {
+						traverse(declarator.init, checkNode);
+					}
+
+					checkFunctionDeclaration(declarator.id.name, declarator.init);
 				}
 			}
 		}
@@ -253,7 +390,7 @@ function readFile() {
 				if (isObjectControllerScope(leftSide.object)) {
 					addNewNodeToCFGOfVariable(leftSide.property.name, true, rightSide, 'DEF');
 					
-					checkFunctionDeclaration(node.expression);
+					checkFunctionDeclaration(leftSide.property.name, rightSide);
 				}
 			}
 		}
@@ -277,7 +414,7 @@ function readFile() {
 				} 	
 				addNewNodeToCFGOfVariable(callee.name, false, node.expression, 'USE');
 				
-				checkNode(funcDefinition);
+				traverse(funcDefinition.body, checkNode);
 			}
 		}
 		
@@ -303,26 +440,7 @@ function readFile() {
 					addNewNodeToCFGOfVariable(callee.property.name, true, node.expression, 'USE');
 				}
 				
-				checkNode(funcDefinition);
-			}
-		}
-		
-	}
-
-	var AssignmentExpressionChecker = function() {
-
-		this.visit = function(node) {
-		
-			if (node.type === 'ExpressionStatement' && 
-				node.expression.type === 'AssignmentExpression') {
-				
-				var leftSide = node.expression.left;
-				var rightSide = node.expression.right;
-				
-				/* It only includes Identifier, can be  MemberExpression 
-				*  Find an absolute and common solution for these */
-				addNewNodeToCFGOfVariable(leftSide.name, false, rightSide, 'DEF');
-				addNewNodeToCFGOfVariable(rightSide.name, false, node.expression, 'USE');
+				traverse(funcDefinition.body, checkNode);
 			}
 		}
 		
@@ -337,8 +455,6 @@ function readFile() {
 				var leftSide = node.test.left;
 				var rightSide = node.test.right;
 				
-				/* It only includes Identifier, can be  MemberExpression or literal or anything,  
-				*  Find an absolute and common solution for these */
 				addNewNodeToCFGOfVariable(leftSide.name, false, node.test, 'USE');
 				addNewNodeToCFGOfVariable(rightSide.name, false, node.test, 'USE');
 				
@@ -346,10 +462,10 @@ function readFile() {
 				tempMetadataListStack.push(newTempMetadataList);
 				isInBlockStack.push(0);
 
-				checkNode(node.consequent);
+				traverse(node.consequent.body, checkNode);
 				if (utility.isDefinedAndNotNull(node.alternate)) {
 					isInBlockStack[isInBlockStack.length - 1] = 1;
-					checkNode(node.alternate);
+					traverse(node.alternate.body, checkNode);
 				}
 				isInBlockStack.pop();
 				
@@ -364,23 +480,72 @@ function readFile() {
 		this.visit = function(node) {
 			
 			if (node.type === 'ForStatement') {
-			
-				var initPart = node.init;
-				var testPart = node.test;
-				var updatePart = node.update;
-				
-				checkNode(initPart); //it should invoke VariableDeclerationChecker
-				checkNode(testPart); //any use of variable in test part, will be handled
-				checkNode(updatePart); //it should add an use node to cfg of i defined it init part.
+				traverse(node.init, checkNode);
+				traverse(node.test, checkNode);
+				traverse(node.update, checkNode);
 				
 				var newTempMetadataList = {};
 				tempMetadataListStack.push(newTempMetadataList);
 				isInBlockStack.push(2);
 
-				checkNode(node.body);
+				traverse(node.body, checkNode);
 				
 				isInBlockStack.pop();
 				transferAndClearTempMetadaList();
+			}
+		}
+		
+	}
+	
+	var ForInStatementChecker = function() {
+
+		this.visit = function(node) {
+			
+			if (node.type === 'ForInStatement') {
+				traverse(node.left, checkNode);
+				traverse(node.right, checkNode);
+				
+				var newTempMetadataList = {};
+				tempMetadataListStack.push(newTempMetadataList);
+				isInBlockStack.push(2);
+
+				traverse(node.body, checkNode);
+				
+				isInBlockStack.pop();
+				transferAndClearTempMetadaList();
+			}
+		}
+		
+	}
+	
+	var WhileStatementChecker = function() {
+
+		this.visit = function(node) {
+			
+			if (node.type === 'WhileStatement') {
+				traverse(node.test, checkNode);
+				
+				var newTempMetadataList = {};
+				tempMetadataListStack.push(newTempMetadataList);
+				isInBlockStack.push(3);
+
+				traverse(node.body, checkNode);
+				
+				isInBlockStack.pop();
+				transferAndClearTempMetadaList();
+			}
+		}
+		
+	}
+	
+	var ReturnStatementChecker = function() {
+	
+		this.visit = function(node) {
+		
+			if (node.type === 'ReturnStatement') {
+				if (utility.isDefinedAndNotNull(node.argument)) {
+					traverse(node.argument, checkNode);
+				}
 			}
 		}
 		
@@ -393,7 +558,7 @@ function readFile() {
 		var syntaxTree = esprima.parse(fileContent, { tolerant: true, loc: true, sourceType: 'script' });
 		traverse(syntaxTree.body, checkNode);
 	} catch (e) {
-		console.log('Could not read the file!');
+		console.log('Could not read the file!' + e);
 	}
 	
 	utility.getElementById('tokens').value = JSON.stringify(metadataList, null, 3);
